@@ -20,7 +20,7 @@ class KeywordService:
     @classmethod
     def from_config(cls, emissor_client: EmissorDataClient,
                     event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
-        config = config_manager.get_config("cltl.leolani.keyword")
+        config = config_manager.get_config("cltl.keyword")
         topics = {
             "intention_topic": config.get("topic_intention"),
             "desire_topic": config.get("topic_desire"),
