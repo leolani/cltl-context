@@ -6,6 +6,7 @@ from cltl.combot.event.bdi import DesireEvent
 from cltl.combot.event.emissor import TextSignalEvent
 from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
+from cltl.combot.infra.event.util import extract_scenario_id
 from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.time_util import timestamp_now
 from cltl.combot.infra.topic_worker import TopicWorker
@@ -66,7 +67,9 @@ class KeywordService:
     def _process(self, event: Event):
         if self._keyword(event):
             self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(['quit'])))
-            self._event_bus.publish(self._text_out_topic, Event.for_payload(self._greeting_payload()))
+            greeting_payload = self._greeting_payload(event)
+            if greeting_payload:
+                self._event_bus.publish(self._text_out_topic, Event.for_payload(greeting_payload))
 
     def _keyword(self, event):
         if event.metadata.topic == self._text_in_topic:
@@ -74,8 +77,12 @@ class KeywordService:
 
         return False
 
-    def _greeting_payload(self):
-        scenario_id = self._emissor_client.get_current_scenario_id()
+    def _greeting_payload(self, input_event):
+        scenario_id = extract_scenario_id(input_event)
+        if not scenario_id:
+            logger.warning("No scenario_id found in event, cannot create greeting")
+            return None
+
         signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None,
                                          random.choice(GOODBYE))
 
