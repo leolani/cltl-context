@@ -67,9 +67,9 @@ class KeywordService:
     def _process(self, event: Event):
         if self._keyword(event):
             self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(['quit'])))
-            greeting_payload = self._greeting_payload(event)
-            if greeting_payload:
-                self._event_bus.publish(self._text_out_topic, Event.for_payload(greeting_payload))
+            scenario_id = extract_scenario_id(event)
+            greeting_payload = self._greeting_payload(scenario_id)
+            self._event_bus.publish(self._text_out_topic, Event.for_payload(greeting_payload))
 
     def _keyword(self, event):
         if event.metadata.topic == self._text_in_topic:
@@ -77,12 +77,7 @@ class KeywordService:
 
         return False
 
-    def _greeting_payload(self, input_event):
-        scenario_id = extract_scenario_id(input_event)
-        if not scenario_id:
-            logger.warning("No scenario_id found in event, cannot create greeting")
-            return None
-
+    def _greeting_payload(self, scenario_id):
         signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None,
                                          random.choice(GOODBYE))
 

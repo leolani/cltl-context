@@ -4,6 +4,7 @@ import re
 import time
 from typing import Mapping
 
+from cltl.combot.infra.event.util import extract_scenario_id
 from cltl.commons.language_data.sentences import GREETING, GOODBYE
 from cltl.combot.event.bdi import DesireEvent
 from cltl.combot.event.emissor import TextSignalEvent
@@ -54,9 +55,8 @@ class InitService:
         self._face_topic = topics["face_topic"]
         self._greeting = greeting
 
-        self._topic_worker = None
-
         self._scenario_id = None
+        self._topic_worker = None
         self._timeout = None
 
     @property
@@ -83,7 +83,9 @@ class InitService:
     def _process(self, event: Event):
         scheduled_invocation = event is None
 
-        self._scenario_id = self._emissor_client.get_current_scenario_id()
+        if event is not None:
+            self._scenario_id = extract_scenario_id(event)
+
         if not self._scenario_id and scheduled_invocation:
             return
 
@@ -91,7 +93,8 @@ class InitService:
             self._await_scenario()
 
         if not self._greeting:
-            self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(["initialized"])))
+            payload = Event.for_payload(DesireEvent(["initialized"]), scenario_id=self._scenario_id)
+            self._event_bus.publish(self._desire_topic, payload)
             logger.info("Initialized without greeting")
             return
 
@@ -99,19 +102,22 @@ class InitService:
 
         if (scheduled_invocation or self._face_or_keyword(event)) and not self._timeout:
             greeting = random.choice(GREETING) + " " + self._greeting
-            self._event_bus.publish(self._text_out_topic, Event.for_payload(self._create_text_signal_event(greeting)))
+            self._event_bus.publish(self._text_out_topic, Event.for_payload(self._create_text_signal_event(greeting),
+                                                                            scenario_id=self._scenario_id))
             self._timeout = timestamp
             logger.info("Start initialization")
         elif scheduled_invocation:
             pass
         elif self._timeout and timestamp - self._timeout < TIMEOUT and self._start_utterance(event):
             self._timeout = None
-            self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(["initialized"])))
+            self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(["initialized"]),
+                                                                          scenario_id=self._scenario_id))
             logger.info("Interaction initialized")
         elif self._timeout and timestamp - self._timeout > TIMEOUT:
             self._timeout = None
             goodbye = random.choice(GOODBYE) + " Let me know when you are back."
-            self._event_bus.publish(self._text_out_topic, Event.for_payload(self._create_text_signal_event(goodbye)))
+            self._event_bus.publish(self._text_out_topic, Event.for_payload(self._create_text_signal_event(goodbye),
+                                                                            scenario_id=self._scenario_id))
             logger.info("Reset initialization")
 
         logger.debug("Unhandled event %s (%s - %s)", event, timestamp, self._timeout)
