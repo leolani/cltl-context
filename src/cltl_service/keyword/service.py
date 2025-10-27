@@ -11,7 +11,6 @@ from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.time_util import timestamp_now
 from cltl.combot.infra.topic_worker import TopicWorker
 from cltl.commons.language_data.sentences import GOODBYE
-from cltl_service.emissordata.client import EmissorDataClient
 from emissor.representation.scenario import TextSignal
 
 logger = logging.getLogger(__name__)
@@ -19,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 class KeywordService:
     @classmethod
-    def from_config(cls, emissor_client: EmissorDataClient,
-                    event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
+    def from_config(cls, event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
         config = config_manager.get_config("cltl.keyword")
         topics = {
             "intention_topic": config.get("topic_intention"),
@@ -29,13 +27,11 @@ class KeywordService:
             "text_out_topic": config.get("topic_text_out")
         }
 
-        return cls(topics, emissor_client, event_bus, resource_manager)
+        return cls(topics, event_bus, resource_manager)
 
-    def __init__(self, topics: Mapping[str, str],
-                 emissor_client: EmissorDataClient, event_bus: EventBus, resource_manager: ResourceManager):
+    def __init__(self, topics: Mapping[str, str], event_bus: EventBus, resource_manager: ResourceManager):
         self._event_bus = event_bus
         self._resource_manager = resource_manager
-        self._emissor_client = emissor_client
 
         self._intention_topic = topics["intention_topic"]
         self._desire_topic = topics["desire_topic"]
