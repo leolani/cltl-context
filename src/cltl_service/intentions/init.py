@@ -1,10 +1,9 @@
 import logging
 import random
 import re
-import time
+from queue import Queue
 from typing import Mapping
 
-from cltl.commons.language_data.sentences import GREETING, GOODBYE
 from cltl.combot.event.bdi import DesireEvent
 from cltl.combot.event.emissor import TextSignalEvent
 from cltl.combot.infra.config import ConfigurationManager
@@ -12,7 +11,7 @@ from cltl.combot.infra.event import Event, EventBus
 from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.time_util import timestamp_now
 from cltl.combot.infra.topic_worker import TopicWorker
-from cltl_service.emissordata.client import EmissorDataClient
+from cltl.commons.language_data.sentences import GREETING, GOODBYE
 from emissor.representation.scenario import TextSignal
 
 logger = logging.getLogger(__name__)
@@ -58,6 +57,7 @@ class InitService:
 
         self._scenario_id = None
         self._timeout = None
+        self._init_queue = Queue()
 
     @property
     def app(self):
@@ -89,14 +89,32 @@ class InitService:
         if not self._scenario_id and scheduled_invocation:
             return
 
+        if not scheduled_invocation and event.metadata.topic == self._scenario_topic:
+            logger.debug("Set scenario")
+            if event.payload.type == "ScenarioStarted":
+                self._scenario_id = event.payload.scenario.id
+                # Trigger processing of init queue
+                self._process(None)
+            elif event.payload.type == "ScenarioStopped":
+                self._scenario_id = None
+
+            return
+
         if not self._scenario_id:
-            logger.debug("Waiting for scenario")
-            # TODO we need to block here :(
-            # Merge this with the context service, at least for scenario creation, only update the context there?
+            self._init_queue.put(event)
+            logger.debug("Waiting for scenario, queued for %s (topic: %s, total: %s)",
+                         event.id, event.metadata.topic, len(self._init_queue.queue))
+            return
+
+        if scheduled_invocation and not self._init_queue.empty():
+            logger.debug("Processing init queue (%s) for scenario %s", len(self._init_queue.queue), self._scenario_id)
+            event = self._init_queue.get()
 
         if not self._greeting:
-            init_event = Event.for_payload(DesireEvent(["initialized"]), source=event)
+            # Add scenario id, as it could be a scheduled invocation without event
+            init_event = Event.for_scenario_payload(self._scenario_id, DesireEvent(["initialized"]), source=event)
             self._event_bus.publish(self._desire_topic, init_event)
+            self._init_queue.queue.clear()
             logger.info("Initialized without greeting")
             return
 
@@ -104,17 +122,17 @@ class InitService:
 
         if (scheduled_invocation or self._face_or_keyword(event)) and not self._timeout:
             greeting = random.choice(GREETING) + " " + self._greeting
-            greeting_event = Event.for_payload(self._create_text_signal_event(greeting), source=event)
+            # Add scenario id, as it could be a scheduled invocation without event
+            greeting_event = Event.for_scenario_payload(self._scenario_id, self._create_text_signal_event(greeting), source=event)
             self._event_bus.publish(self._text_out_topic, greeting_event)
             self._timeout = timestamp
             logger.info("Start initialization")
+        elif scheduled_invocation and not self._init_queue.empty():
+            # Trigger further processing of init queue
+            self._process(None)
+            return
         elif scheduled_invocation:
             pass
-        elif event.metadata.topic == self._scenario_topic:
-            if event.payload.type == "ScenarioStarted":
-                self._scenario_id = event.payload.scenario.id
-            elif event.payload.type == "ScenarioStopped":
-                self._scenario_id = None
         elif self._timeout and timestamp - self._timeout < TIMEOUT and self._start_utterance(event):
             self._timeout = None
             init_event = Event.for_payload(DesireEvent(["initialized"]), source=event)
@@ -126,8 +144,8 @@ class InitService:
             goodbye_event = Event.for_payload(self._create_text_signal_event(goodbye), source=event)
             self._event_bus.publish(self._text_out_topic, goodbye_event)
             logger.info("Reset initialization")
-
-        logger.debug("Unhandled event %s (%s - %s)", event, timestamp, self._timeout)
+        else:
+            logger.debug("Unhandled event %s (%s - %s)", event, timestamp, self._timeout)
 
     def _start_utterance(self, event):
         return event.metadata.topic == self._text_in_topic and "yes" in event.payload.signal.text.lower()
