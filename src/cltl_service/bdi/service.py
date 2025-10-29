@@ -63,7 +63,7 @@ class BDIService:
 
     def _process(self, event: Event):
         if not event.metadata.tenant:
-            raise ValueError("The BDIService can only run in a tenant context!")
+            logger.warning("The BDIService can only run in a tenant context!")
 
         try:
             if event.metadata.topic == self._intention_topic:
