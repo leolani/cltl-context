@@ -56,6 +56,7 @@ class InitService:
         self._topic_worker = None
 
         self._scenario_id = None
+        self._speaker_name = None
         self._timeout = None
         self._init_queue = Queue()
 
@@ -93,6 +94,10 @@ class InitService:
             logger.debug("Set scenario")
             if event.payload.type == "ScenarioStarted":
                 self._scenario_id = event.payload.scenario.id
+                try:
+                    self._speaker_name = event.payload.scenario.context.speaker.name
+                except AttributeError:
+                    pass
                 # Trigger processing of init queue
                 self._process(None)
             elif event.payload.type == "ScenarioStopped":
@@ -121,7 +126,7 @@ class InitService:
         timestamp = timestamp_now()
 
         if (scheduled_invocation or self._face_or_keyword(event)) and not self._timeout:
-            greeting = random.choice(GREETING) + " " + self._greeting
+            greeting = self._get_greeting()
             # Add scenario id, as it could be a scheduled invocation without event
             greeting_event = Event.for_scenario_payload(self._scenario_id, self._create_text_signal_event(greeting), source=event)
             self._event_bus.publish(self._text_out_topic, greeting_event)
@@ -146,6 +151,14 @@ class InitService:
             logger.info("Reset initialization")
         else:
             logger.debug("Unhandled event %s (%s - %s)", event, timestamp, self._timeout)
+
+    def _get_greeting(self) -> str:
+        if self._speaker_name:
+            custom_greeting = self._greeting.format_map({"name": self._speaker_name})
+        else:
+            custom_greeting = self._greeting.replace("{name}", "")
+
+        return random.choice(GREETING) + " " + custom_greeting
 
     def _start_utterance(self, event):
         return event.metadata.topic == self._text_in_topic and "yes" in event.payload.signal.text.lower()
