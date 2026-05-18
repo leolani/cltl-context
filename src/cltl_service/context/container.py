@@ -11,22 +11,16 @@ logger = logging.getLogger(__name__)
 
 
 class ElizaComponentsContainer(InfraContainer):
-    """Container for Eliza cognitive component services: BDI, keyword detection, context, and init intention.
+    """Container for Eliza cognitive component services: BDI, keyword detection, and init intention.
 
-    Requires ``app_service.context`` to be importable from the Python path, as ``ContextService``
-    is part of the application layer rather than a standalone submodule.
+    ContextService is intentionally omitted — it is application-specific and must be added
+    by the application layer (see app/docker-app/app.py).
     """
 
     @property
     @singleton
     def keyword_service(self) -> KeywordService:
         return KeywordService.from_config(self.event_bus, self.resource_manager, self.config_manager)
-
-    @property
-    @singleton
-    def context_service(self) -> "ContextService":
-        from app_service.context.service import ContextService
-        return ContextService.from_config(self.event_bus, self.resource_manager, self.config_manager)
 
     @property
     @singleton
@@ -44,7 +38,6 @@ class ElizaComponentsContainer(InfraContainer):
         super().start()
         self.bdi_service.start()
         self.keyword_service.start()
-        self.context_service.start()
         self.init_intention.start()
 
     def stop(self):
@@ -52,5 +45,4 @@ class ElizaComponentsContainer(InfraContainer):
         self.init_intention.stop()
         self.bdi_service.stop()
         self.keyword_service.stop()
-        self.context_service.stop()
         super().stop()
