@@ -7,13 +7,15 @@ and must be added by the application layer (see ElizaComponentsContainer.context
 """
 import logging.config
 import os
+import time
 
+from cltl.combot.event.bdi import IntentionEvent, Intention
 from cltl.combot.event.emissor import SIG, MEN
 from cltl.combot.infra.config.k8config import K8LocalConfigurationContainer
 from cltl.combot.infra.di_container import singleton
 from cltl.combot.infra.event.api import Event, PAYLOAD
 from cltl.combot.infra.event.memory import SynchronousEventBus
-from cltl_service.context.container import ElizaComponentsContainer
+from cltl_service.container import ElizaComponentsContainer
 from emissor.representation.util import marshal, unmarshal, register_type_var
 from flask import Flask
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
@@ -55,7 +57,21 @@ def main():
     K8LocalConfigurationContainer.load_configuration()
     application = ApplicationContainer()
 
+    config = application.config_manager.get_config("cltl.context")
+    start_scenario = "start_scenario" in config and config.get_boolean("start_scenario")
+
     with application:
+        if start_scenario:
+            intention_topic = application.config_manager.get_config("cltl.bdi").get("topic_intention")
+            application.event_bus.publish(intention_topic, Event.for_payload(IntentionEvent([Intention("init", None)])))
+            logger.info("Published 'init' intention")
+
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                pass
+
         flask_app = Flask(__name__)
 
         @flask_app.route('/health')
