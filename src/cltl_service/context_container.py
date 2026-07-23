@@ -11,7 +11,7 @@ from cltl_service.keyword.service import KeywordService
 logger = logging.getLogger(__name__)
 
 
-class ElizaComponentsContainer(InfraContainer):
+class ContextComponentsContainer(InfraContainer):
     """Container for Eliza cognitive component services: BDI, keyword detection, and init intention.
 
     ContextService is intentionally omitted — it is application-specific and must be added

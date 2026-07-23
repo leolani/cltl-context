@@ -15,7 +15,7 @@ from cltl.combot.infra.config.k8config import K8LocalConfigurationContainer
 from cltl.combot.infra.di_container import singleton
 from cltl.combot.infra.event.api import Event, PAYLOAD
 from cltl.combot.infra.event.memory import SynchronousEventBus
-from cltl_service.container import ElizaComponentsContainer
+from cltl_service.context_container import ContextComponentsContainer
 from emissor.representation.util import marshal, unmarshal, register_type_var
 from flask import Flask
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
@@ -38,7 +38,7 @@ def deserializer(obj):
     return unmarshal(obj, cls=Event)
 
 
-class ApplicationContainer(ElizaComponentsContainer):
+class ApplicationContainer(ContextComponentsContainer):
     @property
     @singleton
     def event_bus_serializer(self):
@@ -62,15 +62,12 @@ def main():
 
     with application:
         if start_scenario:
+            time.sleep(1)
             intention_topic = application.config_manager.get_config("cltl.bdi").get("topic_intention")
             application.event_bus.publish(intention_topic, Event.for_payload(IntentionEvent([Intention("init", None)])))
             logger.info("Published 'init' intention")
-
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                pass
+        else:
+            logger.info("Skip scenario start")
 
         flask_app = Flask(__name__)
 
@@ -80,6 +77,11 @@ def main():
 
         run_simple('0.0.0.0', 8000, DispatcherMiddleware(flask_app),
                    threaded=True, use_reloader=False, use_debugger=False)
+
+        if start_scenario:
+            application.event_bus.publish(intention_topic, Event.for_payload(IntentionEvent([Intention("terminate", None)])))
+
+        time.sleep(1)
 
 
 if __name__ == '__main__':
