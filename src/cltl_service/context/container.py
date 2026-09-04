@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 class ContextComponentsContainer(InfraContainer):
-    """Container for Eliza cognitive component services: BDI, keyword detection, and init intention.
+    """Container for the cognitive component services: context, BDI, keyword detection and init intention.
 
-    ContextService is intentionally omitted — it is application-specific and must be added
-    by the application layer (see app/docker-app/app.py).
+    An application that needs an application-specific ``ContextService`` overrides
+    the ``context_service`` property; the one provided here is then unused.
     """
 
     @property

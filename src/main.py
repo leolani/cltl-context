@@ -1,9 +1,6 @@
-"""Standalone entry point for context/cognitive component services.
+"""Standalone entry point for the context/cognitive component services.
 
-Runs BDI, keyword detection, and init intention services.
-
-Note: ContextService is intentionally omitted here — it is application-specific
-and must be added by the application layer (see ElizaComponentsContainer.context_service).
+Runs the context, BDI, keyword detection and init intention services.
 """
 import logging.config
 import os
@@ -15,7 +12,7 @@ from cltl.combot.infra.config.k8config import K8LocalConfigurationContainer
 from cltl.combot.infra.di_container import singleton
 from cltl.combot.infra.event.api import Event, PAYLOAD
 from cltl.combot.infra.event.memory import SynchronousEventBus
-from cltl_service.context_container import ContextComponentsContainer
+from cltl_service.context.container import ContextComponentsContainer
 from emissor.representation.util import marshal, unmarshal, register_type_var
 from flask import Flask
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
