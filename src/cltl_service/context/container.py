@@ -49,8 +49,16 @@ class ContextComponentsContainer(InfraContainer):
 
     def stop(self):
         logger.info("Stop Eliza services")
-        self.init_intention.stop()
-        self.bdi_service.stop()
-        self.keyword_service.stop()
-        self.context_service.stop()
-        super().stop()
+        try:
+            self.init_intention.stop()
+        finally:
+            try:
+                self.bdi_service.stop()
+            finally:
+                try:
+                    self.keyword_service.stop()
+                finally:
+                    try:
+                        self.context_service.stop()
+                    finally:
+                        super().stop()
