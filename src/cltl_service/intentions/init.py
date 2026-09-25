@@ -75,7 +75,7 @@ class InitService:
 
     def stop(self):
         if not self._topic_worker:
-            pass
+            return
 
         self._topic_worker.stop()
         self._topic_worker.await_stop()
