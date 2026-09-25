@@ -69,10 +69,10 @@ class KeywordService:
 
     def _process(self, event: Event):
         if self._keyword(event):
-            self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(['quit'])))
+            self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(['quit']), source=event))
             scenario_id = extract_scenario_id(event)
             greeting_payload = self._greeting_payload(scenario_id)
-            self._event_bus.publish(self._text_out_topic, Event.for_payload(greeting_payload))
+            self._event_bus.publish(self._text_out_topic, Event.for_payload(greeting_payload, source=event))
 
     def _keyword(self, event):
         if event.metadata.topic == self._text_in_topic:

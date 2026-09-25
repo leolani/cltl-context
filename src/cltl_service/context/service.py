@@ -74,11 +74,11 @@ class ContextService:
             if "init" in intentions:
                 self._start_scenario()
             if "terminate" in intentions:
-                self._stop_scenario()
+                self._stop_scenario(event)
         elif event.metadata.topic == self._desire_topic:
             achieved = event.payload.achieved
             if "quit" in achieved:
-                self._stop_scenario()
+                self._stop_scenario(event)
         elif event.metadata.topic == self._speaker_topic:
             self._update_scenario_speaker(event)
         else:
@@ -87,9 +87,11 @@ class ContextService:
     def _start_scenario(self):
         scenario, capsule = self._create_scenario()
 
-        self._event_bus.publish(self._scenario_topic, Event.for_payload(ScenarioStarted.create(scenario)))
+        self._event_bus.publish(self._scenario_topic,
+                                Event.for_scenario_payload(scenario.id, ScenarioStarted.create(scenario)))
         if self._knowledge_topic:
-            self._event_bus.publish(self._knowledge_topic, Event.for_payload([capsule]))
+            self._event_bus.publish(self._knowledge_topic,
+                                    Event.for_scenario_payload(scenario.id, [capsule]))
 
         self._scenario = scenario
         logger.info("Started scenario %s", scenario)
@@ -102,13 +104,13 @@ class ContextService:
         speaker_name = name_annotation.value.text
         self._scenario.context.speaker = Agent(speaker_name, str(f"http://cltl.nl/leolani/friends/{speaker_name}"))
 
-        self._event_bus.publish(self._scenario_topic, Event.for_payload(ScenarioEvent.create(self._scenario)))
+        self._event_bus.publish(self._scenario_topic, Event.for_payload(ScenarioEvent.create(self._scenario), source=event))
         logger.info("Updated scenario %s", self._scenario)
 
-    def _stop_scenario(self):
+    def _stop_scenario(self, event):
         self._scenario.ruler.end = timestamp_now()
         self._event_bus.publish(self._scenario_topic,
-                                Event.for_payload(ScenarioStopped.create(self._scenario)))
+                                Event.for_payload(ScenarioStopped.create(self._scenario), source=event))
         logger.info("Stopped scenario %s", self._scenario)
 
     def _create_scenario(self):
