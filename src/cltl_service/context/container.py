@@ -40,7 +40,7 @@ class ContextComponentsContainer(InfraContainer):
         return InitService.from_config(self.event_bus, self.resource_manager, self.config_manager)
 
     def start(self):
-        logger.info("Start Eliza services")
+        logger.info("Start Context services")
         super().start()
         self.bdi_service.start()
         self.keyword_service.start()
@@ -48,7 +48,7 @@ class ContextComponentsContainer(InfraContainer):
         self.init_intention.start()
 
     def stop(self):
-        logger.info("Stop Eliza services")
+        logger.info("Stop Context services")
         try:
             self.init_intention.stop()
         finally:

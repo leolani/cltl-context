@@ -1,6 +1,7 @@
 import logging
 import random
-from typing import Mapping
+import string
+from typing import Mapping, List
 
 from cltl.combot.event.bdi import DesireEvent
 from cltl.combot.event.emissor import TextSignalEvent
@@ -27,9 +28,12 @@ class KeywordService:
             "text_out_topic": config.get("topic_text_out")
         }
 
-        return cls(topics, event_bus, resource_manager)
+        intentions = config.get("intentions", multi=True) if "intentions" in config else []
+        keywords = config.get("keywords", multi=True) if "keywords" in config else GOODBYE
 
-    def __init__(self, topics: Mapping[str, str], event_bus: EventBus, resource_manager: ResourceManager):
+        return cls(keywords, intentions, topics, event_bus, resource_manager)
+
+    def __init__(self, keywords: List[str], intentions: List[str], topics: Mapping[str, str], event_bus: EventBus, resource_manager: ResourceManager):
         self._event_bus = event_bus
         self._resource_manager = resource_manager
 
@@ -37,6 +41,9 @@ class KeywordService:
         self._desire_topic = topics["desire_topic"]
         self._text_in_topic = topics["text_in_topic"]
         self._text_out_topic = topics["text_out_topic"]
+
+        self._intentions = intentions
+        self._keywords = keywords
 
         self._topic_worker = None
 
@@ -47,7 +54,7 @@ class KeywordService:
     def start(self, timeout=30):
         self._topic_worker = TopicWorker([self._text_in_topic],
                                          self._event_bus, provides=[self._text_out_topic],
-                                         intentions=["chat"], intention_topic=self._intention_topic,
+                                         intentions=self._intentions, intention_topic=self._intention_topic,
                                          resource_manager=self._resource_manager, processor=self._process,
                                          name=self.__class__.__name__)
         self._topic_worker.start().wait()
@@ -69,7 +76,8 @@ class KeywordService:
 
     def _keyword(self, event):
         if event.metadata.topic == self._text_in_topic:
-            return any(event.payload.signal.text.lower() == bye.lower() for bye in GOODBYE)
+            return any(event.payload.signal.text.lower().strip(string.punctuation) == keyword.lower().strip(string.punctuation)
+                       for keyword in self._keywords)
 
         return False
 
