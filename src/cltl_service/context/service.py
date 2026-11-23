@@ -72,7 +72,7 @@ class ContextService:
         if event.metadata.topic == self._intention_topic:
             intentions = {intention.label for intention in event.payload.intentions}
             if "init" in intentions:
-                self._start_scenario()
+                self._start_scenario(event)
             if "terminate" in intentions:
                 self._stop_scenario(event)
         elif event.metadata.topic == self._desire_topic:
@@ -84,14 +84,16 @@ class ContextService:
         else:
             logger.warning("Unhandled event: %s", event)
 
-    def _start_scenario(self):
-        scenario, capsule = self._create_scenario()
+    def _start_scenario(self, event):
+        scenario, capsule = self._create_scenario(event.metadata.tenant)
 
-        self._event_bus.publish(self._scenario_topic,
-                                Event.for_scenario_payload(scenario.id, ScenarioStarted.create(scenario)))
+        # The scenario id is new, so only the tenant is carried over from the triggering event
+        started = Event.with_tenant(
+            Event.for_scenario_payload(scenario.id, ScenarioStarted.create(scenario)), event.metadata.tenant)
+        self._event_bus.publish(self._scenario_topic, started)
         if self._knowledge_topic:
-            self._event_bus.publish(self._knowledge_topic,
-                                    Event.for_scenario_payload(scenario.id, [capsule]))
+            knowledge = Event.with_tenant(Event.for_scenario_payload(scenario.id, [capsule]), event.metadata.tenant)
+            self._event_bus.publish(self._knowledge_topic, knowledge)
 
         self._scenario = scenario
         logger.info("Started scenario %s", scenario)
@@ -113,7 +115,7 @@ class ContextService:
                                 Event.for_payload(ScenarioStopped.create(self._scenario), source=event))
         logger.info("Stopped scenario %s", self._scenario)
 
-    def _create_scenario(self):
+    def _create_scenario(self, tenant=None):
         signals = {
             Modality.IMAGE.name.lower(): "./image.json",
             Modality.TEXT.name.lower(): "./text.json",
@@ -123,7 +125,7 @@ class ContextService:
         scenario_start = timestamp_now()
         location = self._get_location()
 
-        scenario_context = LeolaniContext(AGENT, SPEAKER, str(uuid.uuid4()), location, [], [])
+        scenario_context = LeolaniContext(AGENT, SPEAKER, str(uuid.uuid4()), location, [], [], tenant)
         scenario = Scenario.new_instance(str(uuid.uuid4()), scenario_start, None, scenario_context, signals)
 
         capsule = {
